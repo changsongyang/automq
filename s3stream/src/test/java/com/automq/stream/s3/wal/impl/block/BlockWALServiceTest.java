@@ -17,11 +17,12 @@ import com.automq.stream.s3.wal.AppendResult;
 import com.automq.stream.s3.wal.RecoverResult;
 import com.automq.stream.s3.wal.WriteAheadLog;
 import com.automq.stream.s3.wal.benchmark.WriteBench;
+import com.automq.stream.s3.wal.common.Record;
 import com.automq.stream.s3.wal.common.RecordHeader;
 import com.automq.stream.s3.wal.exception.OverCapacityException;
 import com.automq.stream.s3.wal.exception.WALCapacityMismatchException;
 import com.automq.stream.s3.wal.exception.WALNotInitializedException;
-import com.automq.stream.s3.wal.impl.block.BlockWALService.RecoverIterator;
+import com.automq.stream.s3.wal.impl.block.BlockWALService.RecoverIteratorV0;
 import com.automq.stream.s3.wal.util.WALBlockDeviceChannel;
 import com.automq.stream.s3.wal.util.WALChannel;
 import com.automq.stream.s3.wal.util.WALUtil;
@@ -55,7 +56,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 
-import static com.automq.stream.s3.wal.common.RecordHeader.RECORD_HEADER_MAGIC_CODE;
 import static com.automq.stream.s3.wal.common.RecordHeader.RECORD_HEADER_SIZE;
 import static com.automq.stream.s3.wal.impl.block.BlockWALService.WAL_HEADER_TOTAL_CAPACITY;
 import static com.automq.stream.s3.wal.util.WALChannelTest.TEST_BLOCK_DEVICE_KEY;
@@ -350,9 +350,9 @@ class BlockWALServiceTest {
         return appended;
     }
 
-    public static Stream<Arguments> testRecoverFromDisasterData() {
+    public static Stream<Arguments> testRecoverFromDisasterV0Data() {
         return Stream.of(
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 WALUtil.BLOCK_SIZE + 1,
                 100L,
                 -1L,
@@ -361,7 +361,7 @@ class BlockWALServiceTest {
                 Arrays.asList(0L, 2L, 4L),
                 WALUtil.BLOCK_SIZE
             ).toArguments("base"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 WALUtil.BLOCK_SIZE + 1,
                 100L,
                 0L,
@@ -370,7 +370,7 @@ class BlockWALServiceTest {
                 Arrays.asList(2L, 4L),
                 WALUtil.BLOCK_SIZE
             ).toArguments("trimmed at zero"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 WALUtil.BLOCK_SIZE + 1,
                 100L,
                 2L,
@@ -379,7 +379,7 @@ class BlockWALServiceTest {
                 Arrays.asList(4L, 6L),
                 WALUtil.BLOCK_SIZE
             ).toArguments("trimmed"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 WALUtil.BLOCK_SIZE + 1,
                 100L,
                 2L,
@@ -388,7 +388,7 @@ class BlockWALServiceTest {
                 Arrays.asList(4L, 6L, 8L, 10L, 12L, 14L, 16L, 18L, 20L),
                 WALUtil.BLOCK_SIZE
             ).toArguments("WAL header flushed slow"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 WALUtil.BLOCK_SIZE + 1,
                 100L,
                 2L,
@@ -397,7 +397,7 @@ class BlockWALServiceTest {
                 Arrays.asList(8L, 10L, 14L, 20L),
                 WALUtil.BLOCK_SIZE
             ).toArguments("many invalid records"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 WALUtil.BLOCK_SIZE + 1,
                 100L,
                 2L,
@@ -406,7 +406,7 @@ class BlockWALServiceTest {
                 Arrays.asList(8L, 10L, 14L, 20L),
                 WALUtil.BLOCK_SIZE
             ).toArguments("write in random order"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 WALUtil.BLOCK_SIZE + 1,
                 100L,
                 20230920L,
@@ -415,7 +415,7 @@ class BlockWALServiceTest {
                 Arrays.asList(20230930L, 20230940L, 20230950L, 20230960L, 20230970L),
                 WALUtil.BLOCK_SIZE
             ).toArguments("big logic offset"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 WALUtil.BLOCK_SIZE + 1,
                 100L,
                 180L,
@@ -424,7 +424,7 @@ class BlockWALServiceTest {
                 Arrays.asList(190L, 200L, 202L, 210L, 220L, 230L),
                 WALUtil.BLOCK_SIZE
             ).toArguments("round robin"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 WALUtil.BLOCK_SIZE * 2 + 1,
                 100L,
                 192L,
@@ -433,7 +433,7 @@ class BlockWALServiceTest {
                 Arrays.asList(195L, 200L, 203L, 206L, 209L, 212L, 215L),
                 WALUtil.BLOCK_SIZE
             ).toArguments("round robin - no place for the last record"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 WALUtil.BLOCK_SIZE + 1,
                 100L,
                 210L,
@@ -443,7 +443,7 @@ class BlockWALServiceTest {
                 Arrays.asList(215L, 220L, 230L, 240L, 250L, 260L),
                 WALUtil.BLOCK_SIZE
             ).toArguments("overwrite"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 WALUtil.BLOCK_SIZE + 1,
                 100L,
                 -1L,
@@ -452,7 +452,7 @@ class BlockWALServiceTest {
                 List.of(0L, 2L),
                 WALUtil.BLOCK_SIZE
             ).toArguments("small window - record size not aligned"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 WALUtil.BLOCK_SIZE + 1,
                 100L,
                 10L,
@@ -461,7 +461,7 @@ class BlockWALServiceTest {
                 List.of(12L, 15L),
                 WALUtil.BLOCK_SIZE
             ).toArguments("invalid record in window - record size not aligned"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 WALUtil.BLOCK_SIZE + 1,
                 100L,
                 10L,
@@ -470,7 +470,7 @@ class BlockWALServiceTest {
                 List.of(14L, 18L),
                 WALUtil.BLOCK_SIZE
             ).toArguments("trim at an invalid record - record size not aligned"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 WALUtil.BLOCK_SIZE,
                 100L,
                 -1L,
@@ -479,7 +479,7 @@ class BlockWALServiceTest {
                 List.of(0L, 1L),
                 WALUtil.BLOCK_SIZE
             ).toArguments("small window - record size aligned"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 WALUtil.BLOCK_SIZE,
                 100L,
                 10L,
@@ -488,7 +488,7 @@ class BlockWALServiceTest {
                 List.of(11L, 13L, 14L),
                 WALUtil.BLOCK_SIZE
             ).toArguments("invalid record in window - record size aligned"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 WALUtil.BLOCK_SIZE,
                 100L,
                 10L,
@@ -497,7 +497,7 @@ class BlockWALServiceTest {
                 List.of(11L, 13L, 15L, 16L),
                 WALUtil.BLOCK_SIZE
             ).toArguments("trim at an invalid record - record size aligned"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 WALUtil.BLOCK_SIZE,
                 100L,
                 10L,
@@ -506,7 +506,7 @@ class BlockWALServiceTest {
                 List.of(11L, 12L),
                 WALUtil.BLOCK_SIZE
             ).toArguments("zero window"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 42,
                 8192L,
                 -1L,
@@ -515,7 +515,7 @@ class BlockWALServiceTest {
                 Arrays.asList(0L, 42L, 84L),
                 1
             ).toArguments("merge write - base"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 42,
                 8192L,
                 42L,
@@ -524,7 +524,7 @@ class BlockWALServiceTest {
                 Arrays.asList(84L, 126L),
                 1
             ).toArguments("merge write - trimmed"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 42,
                 8192L,
                 42L,
@@ -533,7 +533,7 @@ class BlockWALServiceTest {
                 Arrays.asList(42 * 2L, 4096L, 4096L + 42L),
                 1
             ).toArguments("merge write - some invalid records"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 42,
                 8192L,
                 42L,
@@ -542,7 +542,7 @@ class BlockWALServiceTest {
                 Arrays.asList(42 * 2L, 4096L, 4096L + 42L),
                 1
             ).toArguments("merge write - random order"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 1000,
                 8192L,
                 2000L,
@@ -551,7 +551,7 @@ class BlockWALServiceTest {
                 Arrays.asList(3000L, 4000L, 5000L),
                 1
             ).toArguments("merge write - record in the middle"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 42,
                 8192L,
                 8192L + 4096L + 42L,
@@ -560,7 +560,7 @@ class BlockWALServiceTest {
                 Arrays.asList(8192L + 4096L + 42 * 2L, 16384L, 16384L + 42L),
                 1
             ).toArguments("merge write - round robin"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 1000,
                 8192L,
                 12000L,
@@ -570,7 +570,7 @@ class BlockWALServiceTest {
                 Arrays.asList(13000L, 14000L, 15000L),
                 1
             ).toArguments("merge write - overwrite"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 42,
                 4096L * 20,
                 -1L,
@@ -579,7 +579,7 @@ class BlockWALServiceTest {
                 Arrays.asList(0L, 42L, 4096L, 4096L + 42L),
                 1
             ).toArguments("merge write - small window"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 42,
                 4096L * 20,
                 4096L * 2,
@@ -594,7 +594,7 @@ class BlockWALServiceTest {
                     4096L * 5, 4096L * 5 + 42L, 4096L * 6, 4096L * 6 + 42L),
                 1
             ).toArguments("merge write - invalid record in window"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 42,
                 4096L * 20,
                 4096L * 2 + 42 * 2L,
@@ -607,7 +607,7 @@ class BlockWALServiceTest {
                 Arrays.asList(4096L * 3, 4096L * 3 + 42L, 4096L * 5, 4096L * 5 + 42L),
                 1
             ).toArguments("merge write - trim at an invalid record"),
-            new RecoverFromDisasterParam(
+            new RecoverFromDisasterV0Param(
                 42,
                 4096L * 20,
                 4096L * 2,
@@ -628,8 +628,8 @@ class BlockWALServiceTest {
     private static Iterator<RecoverResult> recover(WriteAheadLog wal) {
         Iterator<RecoverResult> iterator = wal.recover();
         assertNotNull(iterator);
-        if (iterator instanceof RecoverIterator) {
-            ((RecoverIterator) iterator).strictMode();
+        if (iterator instanceof RecoverIteratorV0) {
+            ((RecoverIteratorV0) iterator).strictMode();
         }
         return iterator;
     }
@@ -901,12 +901,8 @@ class BlockWALServiceTest {
     }
 
     private ByteBuf recordHeader(ByteBuf body, long offset) {
-        return new RecordHeader()
-            .setMagicCode(RECORD_HEADER_MAGIC_CODE)
-            .setRecordBodyLength(body.readableBytes())
-            .setRecordBodyOffset(offset + RECORD_HEADER_SIZE)
-            .setRecordBodyCRC(WALUtil.crc32(body))
-            .marshal(ByteBufAlloc.byteBuffer(RECORD_HEADER_SIZE), true);
+        return new RecordHeader(offset, body.readableBytes(), WALUtil.crc32(body))
+            .marshal(ByteBufAlloc.byteBuffer(RECORD_HEADER_SIZE));
     }
 
     private void write(WALChannel walChannel, long logicOffset, int recordSize) throws IOException {
@@ -920,16 +916,28 @@ class BlockWALServiceTest {
         writeAndFlush(walChannel, record, position);
     }
 
-    private void writeWALHeader(WALChannel walChannel, long trimOffset, long maxLength) throws IOException {
+    private void writePadding(WALChannel walChannel, long logicOffset, int recordSize) throws IOException {
+        ByteBuf header = ByteBufAlloc.byteBuffer(RECORD_HEADER_SIZE);
+        Record paddingRecord = WALUtil.generatePaddingRecord(header, logicOffset, recordSize);
+
+        CompositeByteBuf record = ByteBufAlloc.compositeByteBuffer();
+        record.addComponents(true, paddingRecord.header(), paddingRecord.body());
+
+        long position = WALUtil.recordOffsetToPosition(logicOffset, walChannel.capacity(), WAL_HEADER_TOTAL_CAPACITY);
+        writeAndFlush(walChannel, record, position);
+    }
+
+    private void writeWALHeader(WALChannel walChannel, int version, long trimOffset, long maxLength) throws IOException {
         ByteBuf header = new BlockWALHeader(walChannel.capacity(), maxLength)
+            .updateVersion(version)
             .updateTrimOffset(trimOffset)
             .marshal();
         writeAndFlush(walChannel, header, 0);
     }
 
     @ParameterizedTest(name = "Test {index} {0}")
-    @MethodSource("testRecoverFromDisasterData")
-    public void testRecoverFromDisaster(
+    @MethodSource("testRecoverFromDisasterV0Data")
+    public void testRecoverFromDisasterV0(
         String name,
         int recordSize,
         long capacity,
@@ -938,13 +946,13 @@ class BlockWALServiceTest {
         List<Long> writeOffsets,
         List<Long> recoveredOffsets
     ) throws IOException {
-        testRecoverFromDisaster0(name, recordSize, capacity, trimOffset, maxLength, writeOffsets, recoveredOffsets, false);
+        testRecoverFromDisasterV00(name, recordSize, capacity, trimOffset, maxLength, writeOffsets, recoveredOffsets, false);
     }
 
     @ParameterizedTest(name = "Test {index} {0}")
-    @MethodSource("testRecoverFromDisasterData")
+    @MethodSource("testRecoverFromDisasterV0Data")
     @EnabledOnOs({OS.LINUX})
-    public void testRecoverFromDisasterDirectIO(
+    public void testRecoverFromDisasterV0DirectIO(
         String name,
         int recordSize,
         long capacity,
@@ -953,10 +961,10 @@ class BlockWALServiceTest {
         List<Long> writeOffsets,
         List<Long> recoveredOffsets
     ) throws IOException {
-        testRecoverFromDisaster0(name, recordSize, capacity, trimOffset, maxLength, writeOffsets, recoveredOffsets, true);
+        testRecoverFromDisasterV00(name, recordSize, capacity, trimOffset, maxLength, writeOffsets, recoveredOffsets, true);
     }
 
-    private void testRecoverFromDisaster0(
+    private void testRecoverFromDisasterV00(
         String name,
         int recordSize,
         long capacity,
@@ -987,7 +995,7 @@ class BlockWALServiceTest {
 
         // Simulate disaster
         walChannel.open();
-        writeWALHeader(walChannel, trimOffset, maxLength);
+        writeWALHeader(walChannel, 0, trimOffset, maxLength);
         for (long writeOffset : writeOffsets) {
             write(walChannel, writeOffset, recordSize);
         }
@@ -1352,7 +1360,7 @@ class BlockWALServiceTest {
         channel.flush();
     }
 
-    private static class RecoverFromDisasterParam {
+    private static class RecoverFromDisasterV0Param {
         int recordSize;
         long capacity;
         // WAL header
@@ -1362,7 +1370,7 @@ class BlockWALServiceTest {
         List<Long> writeOffsets;
         List<Long> recoveredOffsets;
 
-        public RecoverFromDisasterParam(
+        public RecoverFromDisasterV0Param(
             int recordSize,
             long capacity,
             long trimOffset,
@@ -1381,6 +1389,90 @@ class BlockWALServiceTest {
 
         public Arguments toArguments(String name) {
             return Arguments.of(name, recordSize, capacity, trimOffset, maxLength, writeOffsets, recoveredOffsets);
+        }
+    }
+
+    @Test
+    public void testRecoverFromDisasterV1() throws IOException {
+        String path = TestUtils.tempFilePath();
+        WALChannel walChannel = WALChannel.builder(path)
+            .capacity(WAL_HEADER_TOTAL_CAPACITY + WALUtil.BLOCK_SIZE * 100L)
+            .direct(false)
+            .build();
+
+        // Simulate disaster
+        walChannel.open();
+        writeWALHeader(walChannel, 1, WALUtil.BLOCK_SIZE * 190L, WALUtil.BLOCK_SIZE * 50L);
+        // Write records
+        // trimmed records
+        write(walChannel, WALUtil.BLOCK_SIZE * 190L, WALUtil.BLOCK_SIZE + 1);
+        // valid records
+        write(walChannel, WALUtil.BLOCK_SIZE * 192L, WALUtil.BLOCK_SIZE + 1);
+        write(walChannel, WALUtil.BLOCK_SIZE * 194L, WALUtil.BLOCK_SIZE + 1);
+        // padding records
+        writePadding(walChannel, WALUtil.BLOCK_SIZE * 196L, WALUtil.BLOCK_SIZE * 4);
+        // valid records
+        write(walChannel, WALUtil.BLOCK_SIZE * 200L, WALUtil.BLOCK_SIZE + 1);
+        write(walChannel, WALUtil.BLOCK_SIZE * 202L, WALUtil.BLOCK_SIZE + 1);
+        // invalid records
+        write(walChannel, WALUtil.BLOCK_SIZE * 210L, WALUtil.BLOCK_SIZE + 1);
+        write(walChannel, WALUtil.BLOCK_SIZE * 212L, WALUtil.BLOCK_SIZE + 1);
+        walChannel.close();
+
+        // Recover records
+        final WriteAheadLog wal = BlockWALService.builder(path, walChannel.capacity())
+            .direct(false)
+            .build()
+            .start();
+        try {
+            Iterator<RecoverResult> recover = recover(wal);
+            List<Long> recovered = new ArrayList<>();
+            while (recover.hasNext()) {
+                RecoverResult next = recover.next();
+                next.record().release();
+                recovered.add(next.recordOffset());
+            }
+            assertEquals(Arrays.asList(
+                WALUtil.BLOCK_SIZE * 192L,
+                WALUtil.BLOCK_SIZE * 194L,
+                WALUtil.BLOCK_SIZE * 200L,
+                WALUtil.BLOCK_SIZE * 202L
+            ), recovered);
+            wal.reset().join();
+        } finally {
+            wal.shutdownGracefully();
+        }
+    }
+
+    @Test
+    public void testUpgradeFromV0ToV1() throws IOException {
+        String path = TestUtils.tempFilePath();
+        WALChannel walChannel = WALChannel.builder(path)
+            .capacity(WAL_HEADER_TOTAL_CAPACITY + WALUtil.BLOCK_SIZE * 100L)
+            .direct(false)
+            .build();
+
+        walChannel.open();
+        writeWALHeader(walChannel, 0, 0, 0);
+        walChannel.close();
+
+        final BlockWALService wal = (BlockWALService) BlockWALService.builder(path, walChannel.capacity())
+            .direct(false)
+            .build()
+            .start();
+
+        try {
+            assertEquals(0, wal.header().version());
+
+            for (Iterator<RecoverResult> it = recover(wal); it.hasNext(); ) {
+                it.next().record().release();
+            }
+            assertEquals(0, wal.header().version());
+
+            wal.reset().join();
+            assertEquals(1, wal.header().version());
+        } finally {
+            wal.shutdownGracefully();
         }
     }
 }
