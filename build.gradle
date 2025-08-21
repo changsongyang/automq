@@ -3828,6 +3828,8 @@ project(':opentelemetry') {
 
     // Yammer metrics (for integration)
     api 'com.yammer.metrics:metrics-core:2.2.0'
+
+    implementation project(':s3stream')
     
     // Test dependencies
     testImplementation libs.junitJupiter
