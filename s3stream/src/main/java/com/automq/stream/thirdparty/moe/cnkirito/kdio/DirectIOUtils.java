@@ -40,10 +40,10 @@ public class DirectIOUtils {
      * @return A new JnaMemAlignedBuffer of <tt>capacity</tt> bytes aligned in native memory.
      */
     public static ByteBuffer allocateForDirectIO(DirectIOLib lib, int capacity) {
-        if (capacity % lib.blockSize() > 0) {
-            throw new IllegalArgumentException("Capacity (" + capacity + ") must be a multiple"
-                + "of the block size (" + lib.blockSize() + ")");
-        }
+//        if (capacity % lib.blockSize() > 0) {
+//            throw new IllegalArgumentException("Capacity (" + capacity + ") must be a multiple"
+//                + "of the block size (" + lib.blockSize() + ")");
+//        }
         NativeLong blockSize = new NativeLong(lib.blockSize());
         PointerByReference pointerToPointer = new PointerByReference();
 
